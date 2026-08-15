@@ -59,3 +59,8 @@ fastlane/metadata-play/android/en-US/changelogs
 
 apps/readest.koplugin/bin/
 apps/readest.koplugin/native/localsend-bin/target/
+
+# pnpm workspace nested node_modules (root-anchored /node_modules above
+# misses these in a monorepo)
+**/node_modules
+**/.next/
