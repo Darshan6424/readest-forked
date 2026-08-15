@@ -65,3 +65,4 @@ apps/readest.koplugin/native/localsend-bin/target/
 **/node_modules
 **/.next/
 .pnpm-store/
+.pnpm-store/
