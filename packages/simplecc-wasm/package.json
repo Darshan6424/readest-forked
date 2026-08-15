@@ -1,0 +1,75 @@
+{
+  "name": "simplecc-wasm",
+  "version": "1.1.0",
+  "type": "module",
+  "description": "Simple OpenCC alternative with wasm",
+  "main": "pkg/nodejs/simplecc_wasm.js",
+  "exports": {
+    ".": {
+      "node": {
+        "types": "./pkg/nodejs/simplecc_wasm.d.ts",
+        "default": "./pkg/nodejs/simplecc_wasm.js"
+      },
+      "deno": {
+        "types": "./pkg/deno/simplecc_wasm.d.ts",
+        "default": "./pkg/deno/simplecc_wasm.js"
+      },
+      "browser": {
+        "types": "./pkg/web/simplecc_wasm.d.ts",
+        "default": "./pkg/web/simplecc_wasm.js"
+      },
+      "import": {
+        "types": "./pkg/web/simplecc_wasm.d.ts",
+        "default": "./pkg/web/simplecc_wasm.js"
+      },
+      "require": {
+        "types": "./pkg/nodejs/simplecc_wasm.d.ts",
+        "default": "./pkg/nodejs/simplecc_wasm.js"
+      }
+    },
+    "./web": {
+      "types": "./pkg/web/simplecc_wasm.d.ts",
+      "default": "./pkg/web/simplecc_wasm.js"
+    },
+    "./node": {
+      "types": "./pkg/nodejs/simplecc_wasm.d.ts",
+      "default": "./pkg/nodejs/simplecc_wasm.js"
+    },
+    "./deno": {
+      "types": "./pkg/deno/simplecc_wasm.d.ts",
+      "default": "./pkg/deno/simplecc_wasm.js"
+    }
+  },
+  "scripts": {
+    "build": "make",
+    "prepublish": "npm run build && npm run test",
+    "build:cargo": "cargo build --release --target wasm32-unknown-unknown",
+    "build:nodejs": "wasm-bindgen target/wasm32-unknown-unknown/release/simplecc_wasm.wasm --out-dir ./pkg/nodejs --target nodejs",
+    "build:web": "wasm-bindgen target/wasm32-unknown-unknown/release/simplecc_wasm.wasm --out-dir ./pkg/web --target web",
+    "build:opt": "wasm-opt -O3 -o pkg/web/simplecc_wasm_bg.wasm pkg/web/simplecc_wasm_bg.wasm && wasm-opt -O3 -o pkg/nodejs/simplecc_wasm_bg.wasm pkg/nodejs/simplecc_wasm_bg.wasm",
+    "test": "vitest --run"
+  },
+  "files": [
+    "pkg/**/*"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fengkx/simplecc-wasm.git"
+  },
+  "keywords": [
+    "wasm",
+    "opencc",
+    "simplecc"
+  ],
+  "author": "fengkx",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/fengkx/simplecc-wasm/issues"
+  },
+  "homepage": "https://github.com/fengkx/simplecc-wasm#readme",
+  "devDependencies": {
+    "vite": "^7.2.4",
+    "vite-node": "^5.2.0",
+    "vitest": "^4.0.13"
+  }
+}
