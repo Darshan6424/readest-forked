@@ -64,3 +64,4 @@ apps/readest.koplugin/native/localsend-bin/target/
 # misses these in a monorepo)
 **/node_modules
 **/.next/
+.pnpm-store/
