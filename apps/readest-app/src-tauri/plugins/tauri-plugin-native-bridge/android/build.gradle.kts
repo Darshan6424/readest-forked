@@ -3,6 +3,12 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val selectedStoreFlavor =
+    when ((project.findProperty("storeFlavor") as String?)?.lowercase()) {
+        "googleplay" -> "googleplay"
+        else -> "foss"
+    }
+
 android {
     namespace = "com.readest.native_bridge"
     compileSdk = 36
@@ -38,6 +44,13 @@ android {
         }
         create("googleplay") {
             dimension = "store"
+        }
+    }
+
+    variantFilter {
+        val store = flavors.find { it.dimension == "store" }?.name
+        if (store != null && store != selectedStoreFlavor) {
+            ignore = true
         }
     }
 }
