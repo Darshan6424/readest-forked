@@ -1,0 +1,227 @@
+name: Build self-hosted apps
+
+on:
+  workflow_dispatch:
+
+env:
+  NEXT_PUBLIC_APP_PLATFORM: tauri
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SELFHOST_SUPABASE_URL }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SELFHOST_SUPABASE_ANON_KEY }}
+  NEXT_PUBLIC_API_BASE_URL: ${{ secrets.SELFHOST_API_BASE_URL }}
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            target: i686-pc-windows-msvc
+            bundles: nsis
+            artifact: windows-installer
+          - platform: macos-latest
+            target: universal-apple-darwin
+            bundles: dmg
+            artifact: macos-dmg
+          - platform: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bundles: appimage
+            artifact: linux-appimage
+    runs-on: ${{ matrix.platform }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux build deps
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev patchelf build-essential libssl-dev libgtk-3-dev
+
+      - name: Install JS deps
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Vendor assets (pdf.js, simplecc, jieba)
+        working-directory: apps/readest-app
+        run: pnpm setup-vendors
+
+      - name: Write env file
+        working-directory: apps/readest-app
+        run: |
+          cat > .env.tauri.local << EOF
+          NEXT_PUBLIC_APP_PLATFORM=tauri
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SELFHOST_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SELFHOST_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_API_BASE_URL=${{ secrets.SELFHOST_API_BASE_URL }}
+          EOF
+
+      # createUpdaterArtifacts is true in the base tauri.conf.json, which
+      # makes `tauri build` try to sign an updater manifest -- needs
+      # TAURI_SIGNING_PRIVATE_KEY, which we neither have nor want (we're
+      # not pointing updates at Readest's infra). Override via a real file
+      # rather than inline --config JSON: inline JSON gets shell-escaped
+      # differently by bash vs PowerShell and is a known source of
+      # "Couldn't parse --config flag" failures across the OS matrix.
+      - name: Write updater-disable config override
+        working-directory: apps/readest-app
+        run: |
+          cat > tauri.no-updater.conf.json << 'EOF'
+          { "bundle": { "createUpdaterArtifacts": false } }
+          EOF
+
+      - name: Build
+        working-directory: apps/readest-app
+        run: pnpm exec dotenv -e .env.tauri.local -- pnpm exec tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config tauri.no-updater.conf.json
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            apps/readest-app/src-tauri/target/${{ matrix.target }}/release/bundle/**/*
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install NDK
+        run: sdkmanager --install "ndk;27.0.12077973"
+
+      - name: Install JS deps
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Vendor assets
+        working-directory: apps/readest-app
+        run: pnpm setup-vendors
+
+      - name: Write env file
+        working-directory: apps/readest-app
+        run: |
+          cat > .env.tauri << EOF
+          NEXT_PUBLIC_APP_PLATFORM=tauri
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SELFHOST_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SELFHOST_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_API_BASE_URL=${{ secrets.SELFHOST_API_BASE_URL }}
+          EOF
+
+      - name: Init android project
+        working-directory: apps/readest-app
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973
+        run: pnpm exec dotenv -e .env.tauri -- pnpm exec tauri android init
+
+      - name: Build APK
+        working-directory: apps/readest-app
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973
+        run: pnpm exec dotenv -e .env.tauri -- pnpm exec tauri android build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: apps/readest-app/src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
+          if-no-files-found: error
+
+  ios:
+    runs-on: macos-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+
+      - name: Install JS deps
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Vendor assets
+        working-directory: apps/readest-app
+        run: pnpm setup-vendors
+
+      - name: Write env file
+        working-directory: apps/readest-app
+        run: |
+          cat > .env.tauri << EOF
+          NEXT_PUBLIC_APP_PLATFORM=tauri
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SELFHOST_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SELFHOST_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_API_BASE_URL=${{ secrets.SELFHOST_API_BASE_URL }}
+          EOF
+
+      - name: Init iOS project
+        working-directory: apps/readest-app
+        run: pnpm exec dotenv -e .env.tauri -- pnpm exec tauri ios init
+
+      - name: Build (unsigned/dev)
+        working-directory: apps/readest-app
+        run: pnpm exec dotenv -e .env.tauri -- pnpm exec tauri ios build
+        # Unsigned without an Apple Developer account's certificate +
+        # provisioning profile wired in as additional secrets -- Apple's
+        # requirement, unrelated to self-hosting.
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: apps/readest-app/src-tauri/gen/apple/build/**/*
+          if-no-files-found: warn

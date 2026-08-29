@@ -1,4 +1,4 @@
-import { isWebAppPlatform } from '@/services/environment';
+import { isWebAppPlatform, getAPIBaseUrl } from '@/services/environment';
 import { downloadFile } from '@/libs/storage';
 import type { AppService } from '@/types/system';
 import type { ProgressHandler } from '@/utils/transfer';
@@ -6,7 +6,14 @@ import { webDownload } from '@/utils/transfer';
 import { GlossIndex } from './glossIndex';
 import type { GlossIndexData } from './types';
 
-export const WORDLENS_CDN_BASE = 'https://cdn.readest.com/wordlens';
+// Readest's CDN only sends CORS headers for readest.com-family origins, so a
+// direct browser fetch from a self-hosted domain/IP gets blocked ("No
+// Access-Control-Allow-Origin header"). Server-to-server requests aren't
+// subject to CORS, so we proxy through our own API route instead -- see
+// src/app/api/wordlens/[...path]/route.ts. A function (not a top-level
+// const) so it always reads the current runtime config rather than
+// whatever was available the instant this module first loaded.
+export const getWordlensCdnBase = () => `${getAPIBaseUrl()}/wordlens`;
 const STORE_DIR = 'wordlens'; // relative dir under BaseDir 'Data'
 const MANIFEST_FILE = 'manifest.json';
 
@@ -148,7 +155,7 @@ export const fetchManifest = async (
   const download = getDownloader(appService, opts?.download);
   manifestPromise = (async () => {
     try {
-      const bytes = await download(`${WORDLENS_CDN_BASE}/${MANIFEST_FILE}`);
+      const bytes = await download(`${getWordlensCdnBase()}/${MANIFEST_FILE}`);
       const text = new TextDecoder().decode(bytes);
       const manifest = JSON.parse(text) as WordLensManifest;
       await ensureStoreDir(appService);
@@ -184,7 +191,7 @@ const ensurePackUncached = async (
   if (opts?.allowDownload === false) return null;
 
   const download = getDownloader(appService, opts?.download);
-  const url = `${WORDLENS_CDN_BASE}/${pack.file}?v=${pack.sha256.slice(0, 8)}`;
+  const url = `${getWordlensCdnBase()}/${pack.file}?v=${pack.sha256.slice(0, 8)}`;
   let bytes: ArrayBuffer;
   try {
     bytes = await download(url, opts?.onProgress);
