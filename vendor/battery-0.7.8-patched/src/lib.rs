@@ -20,9 +20,9 @@
 //! [battop](https://crates.io/crates/battop) crate is using this library as a knowledge source,
 //! so check it out too for a real-life example.
 
-#![deny(unused)]
-#![deny(unstable_features)]
-#![deny(bare_trait_objects)]
+#![allow(unused)]
+#![allow(unstable_features)]
+#![allow(bare_trait_objects)]
 #![allow(clippy::manual_non_exhaustive)]  // MSRV is 1.36
 #![doc(html_root_url = "https://docs.rs/battery/0.7.8")]
 
