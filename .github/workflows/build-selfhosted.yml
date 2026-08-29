@@ -94,7 +94,7 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: |
-            src-tauri/target/${{ matrix.target }}/release/bundle/**/*
+            apps/readest-app/src-tauri/target/${{ matrix.target }}/release/bundle/**/*
           if-no-files-found: error
 
   android:
